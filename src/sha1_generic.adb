@@ -14,7 +14,10 @@ package body SHA1_Generic is
    end Update;
 
    procedure Update (Ctx : in out Context; Input : Element_Array) is
+      First : Index := Input'First;
    begin
+      Ctx.Count := Ctx.Count + Unsigned_64 (Input'Length);
+
       pragma Compile_Time_Warning (Standard.True, "Update unimplemented");
       raise Program_Error with "Unimplemented procedure Update";
    end Update;
@@ -44,4 +47,16 @@ package body SHA1_Generic is
       Update (Ctx, Input);
       return Finalize (Ctx);
    end Hash;
+
+   procedure Transform (Ctx : in out Context; Buffer : Block) is
+   begin
+      null;
+   end Transform;
+
+   function Ch (X, Y, Z : Unsigned_32) return Unsigned_32 is
+     ((X and Y) xor ((not X) and Z));
+   function Parity (X, Y, Z : Unsigned_32) return Unsigned_32 is
+     (X xor Y xor Z);
+   function Maj (X, Y, Z : Unsigned_32) return Unsigned_32 is
+     ((X and Y) xor (X and Z) xor (Y and Z));
 end SHA1_Generic;

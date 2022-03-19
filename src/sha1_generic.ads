@@ -1,4 +1,3 @@
-with Ada.Streams; use Ada.Streams;
 with Interfaces;
 
 generic
@@ -35,6 +34,9 @@ is
 private
    use Interfaces;
 
+   subtype Block is
+     Element_Array (Index'First .. Index'First + Block_Length - 1);
+
    type Context is record
       H0 : Unsigned_32 := 16#6745_2301#;
       H1 : Unsigned_32 := 16#EFCD_AB89#;
@@ -44,7 +46,11 @@ private
 
       Count : Unsigned_64 := 0;
 
-      Buffer : Element_Array (Index'First .. Index'First + Block_Length - 1) :=
-        (others => 0);
+      Buffer : Block;
    end record;
+
+   procedure Transform (Ctx : in out Context; Buffer : Block);
+   function Ch (X, Y, Z : Unsigned_32) return Unsigned_32;
+   function Parity (X, Y, Z : Unsigned_32) return Unsigned_32;
+   function Maj (X, Y, Z : Unsigned_32) return Unsigned_32;
 end SHA1_Generic;
