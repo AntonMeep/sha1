@@ -1,4 +1,5 @@
 pragma Ada_2012;
+
 package body SHA1_Generic is
    function Initialize return Context is (others => <>);
 
@@ -51,9 +52,6 @@ package body SHA1_Generic is
    procedure Transform (Ctx : in out Context; Buffer : Block) is
       type Words is array (Natural range <>) of Unsigned_32;
 
-      Buffer_Words : Words (0 .. 15);
-      for Buffer_Words'Address use Buffer'Address;
-
       W : Words (0 .. 79);
 
       A         : Unsigned_32 := Ctx.H0;
@@ -63,9 +61,18 @@ package body SHA1_Generic is
       E         : Unsigned_32 := Ctx.H4;
       Temporary : Unsigned_32;
    begin
-      --  Byte order fix here
-
-      W (0 .. 15) := Buffer_Words;
+      declare
+         J : Index := Buffer'First;
+      begin
+         for I in 0 .. 15 loop
+            W (I) :=
+              Shift_Left (Unsigned_32 (Buffer (J + 0)), 24) or
+              Shift_Left (Unsigned_32 (Buffer (J + 1)), 16) or
+              Shift_Left (Unsigned_32 (Buffer (J + 2)), 8) or
+              Unsigned_32 (Buffer (J + 3));
+            J := J + 4;
+         end loop;
+      end;
 
       for I in 16 .. 79 loop
          W (I) :=
