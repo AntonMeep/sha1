@@ -57,22 +57,26 @@ package body SHA1 is
         (Ctx.Count rem Block_Length);
       Current : Stream_Element_Offset := Output'First;
    begin
-      if Final_Count /= 0 or else Ctx.Count = 0 then
-         --  Insert padding
-         Update (Ctx, Stream_Element_Array'(0 => 16#80#));
+      --  Insert padding
+      Update (Ctx, Stream_Element_Array'(0 => 16#80#));
 
-         for I in 1 .. (Block_Length - Final_Count - 9) loop
+      for I in 1 .. (Block_Length - Final_Count - 9) loop
+         Update (Ctx, Stream_Element_Array'(0 => 0));
+      end loop;
+
+      if Final_Count + 8 >= Block_Length then
+         for I in 1 .. (Block_Length - Final_Count) + (Block_Length - 9) loop
             Update (Ctx, Stream_Element_Array'(0 => 0));
          end loop;
-
-         --  Since we know that Final_Count < Block_Length (64)
-         --  We only need to encode lower bytes, rest is 0
-         Update
-           (Ctx,
-            Stream_Element_Array'
-              (0 .. 5 => 0, 6 => Stream_Element ((Final_Count * 8) / 256),
-               7      => Stream_Element ((Final_Count * 8) rem 256)));
       end if;
+
+      --  Since we know that Final_Count < Block_Length (64)
+      --  We only need to encode lower bytes, rest is 0
+      Update
+        (Ctx,
+         Stream_Element_Array'
+           (0 .. 5 => 0, 6 => Stream_Element ((Final_Count * 8) / 256),
+            7      => Stream_Element ((Final_Count * 8) rem 256)));
 
       for H of Ctx.State loop
          Output (Current + 0) :=
