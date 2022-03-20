@@ -1,24 +1,29 @@
 pragma Ada_2012;
 
-package body SHA1_Generic is
-   function Initialize return Context is (others => <>);
+package body SHA1 is
+   function Initialize return Context is
+      Ctx : Context;
+   begin
+      return Ctx;
+   end Initialize;
 
    procedure Initialize (Ctx : out Context) is
+      Result : Context;
    begin
-      Ctx := (others => <>);
+      Ctx := Result;
    end Initialize;
 
    procedure Update (Ctx : in out Context; Input : String) is
+      Buffer : Stream_Element_Array
+        (Stream_Element_Offset (Input'First) ..
+             Stream_Element_Offset (Input'Last));
+      for Buffer'Address use Input'Address;
    begin
-      pragma Compile_Time_Warning (Standard.True, "Update unimplemented");
-      raise Program_Error with "Unimplemented procedure Update";
+      Update (Ctx, Buffer);
    end Update;
 
-   procedure Update (Ctx : in out Context; Input : Element_Array) is
-      First : Index := Input'First;
+   procedure Update (Ctx : in out Context; Input : Stream_Element_Array) is
    begin
-      Ctx.Count := Ctx.Count + Unsigned_64 (Input'Length);
-
       pragma Compile_Time_Warning (Standard.True, "Update unimplemented");
       raise Program_Error with "Unimplemented procedure Update";
    end Update;
@@ -42,7 +47,7 @@ package body SHA1_Generic is
       return Finalize (Ctx);
    end Hash;
 
-   function Hash (Input : Element_Array) return Digest is
+   function Hash (Input : Stream_Element_Array) return Digest is
       Ctx : Context := Initialize;
    begin
       Update (Ctx, Input);
@@ -62,7 +67,7 @@ package body SHA1_Generic is
       Temporary : Unsigned_32;
    begin
       declare
-         J : Index := Buffer'First;
+         J : Stream_Element_Offset := Buffer'First;
       begin
          for I in 0 .. 15 loop
             W (I) :=
@@ -133,4 +138,4 @@ package body SHA1_Generic is
      (X xor Y xor Z);
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32 is
      ((X and Y) xor (X and Z) xor (Y and Z));
-end SHA1_Generic;
+end SHA1;
