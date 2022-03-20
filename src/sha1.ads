@@ -18,8 +18,8 @@ is
    procedure Update (Ctx : in out Context; Input : String);
    procedure Update (Ctx : in out Context; Input : Stream_Element_Array);
 
-   function Finalize (Ctx : Context) return Digest;
-   procedure Finalize (Ctx : Context; Output : out Digest);
+   function Finalize (Ctx : in out Context) return Digest;
+   procedure Finalize (Ctx : in out Context; Output : out Digest);
 
    function Hash (Input : String) return Digest;
    function Hash (Input : Stream_Element_Array) return Digest;
@@ -28,15 +28,13 @@ private
 
    subtype Block is Stream_Element_Array (0 .. Block_Length - 1);
 
+   type State_Array is array (Natural range 0 .. 4) of Unsigned_32;
+
    type Context is record
-      H0 : Unsigned_32 := 16#6745_2301#;
-      H1 : Unsigned_32 := 16#EFCD_AB89#;
-      H2 : Unsigned_32 := 16#98BA_DCFE#;
-      H3 : Unsigned_32 := 16#1032_5476#;
-      H4 : Unsigned_32 := 16#C3D2_E1F0#;
-
-      Count : Stream_Element_Offset := 0;
-
+      State : State_Array :=
+        (16#6745_2301#, 16#EFCD_AB89#, 16#98BA_DCFE#, 16#1032_5476#,
+         16#C3D2_E1F0#);
+      Count  : Stream_Element_Offset := 0;
       Buffer : Block;
    end record;
 

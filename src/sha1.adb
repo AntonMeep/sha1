@@ -23,21 +23,60 @@ package body SHA1 is
    end Update;
 
    procedure Update (Ctx : in out Context; Input : Stream_Element_Array) is
+      Buffer_First : Stream_Element_Offset;
+      Buffer_Last  : Stream_Element_Offset;
+      Current      : Stream_Element_Offset := Input'First;
    begin
-      pragma Compile_Time_Warning (Standard.True, "Update unimplemented");
-      raise Program_Error with "Unimplemented procedure Update";
+      loop
+         Buffer_First := Ctx.Count rem Block_Length;
+         Buffer_Last  :=
+           Stream_Element_Offset'Min (Input'Last - Current, Ctx.Buffer'Last);
+         Ctx.Buffer (Buffer_First .. Buffer_Last) :=
+           Input (Current .. Current + Buffer_Last);
+         Current   := Current + Buffer_Last + 1;
+         Ctx.Count := Ctx.Count + Buffer_Last - Buffer_First;
+
+         if Buffer_Last = Ctx.Buffer'Last then --  Full chunk ready
+            Transform (Ctx, Ctx.Buffer);
+         end if;
+
+         exit when Current > Input'Last;
+      end loop;
    end Update;
 
-   function Finalize (Ctx : Context) return Digest is
+   function Finalize (Ctx : in out Context) return Digest is
+      Result : Digest;
    begin
-      pragma Compile_Time_Warning (Standard.True, "Finalize unimplemented");
-      return raise Program_Error with "Unimplemented function Finalize";
+      Finalize (Ctx, Result);
+      return Result;
    end Finalize;
 
-   procedure Finalize (Ctx : Context; Output : out Digest) is
+   procedure Finalize (Ctx : in out Context; Output : out Digest) is
+      Final_Count : Stream_Element_Offset := (Ctx.Count rem Block_Length);
    begin
-      pragma Compile_Time_Warning (Standard.True, "Finalize unimplemented");
-      raise Program_Error with "Unimplemented procedure Finalize";
+      if Final_Count /= 0 then
+         --  Insert padding
+         Update (Ctx, Stream_Element_Array'(0 => 16#80#));
+
+         for I in 0 .. (Block_Length - Final_Count - 5) loop
+            Update (Ctx, Stream_Element_Array'(0 => 0));
+         end loop;
+
+         --  Since we know that Final_Count < Block_Length (64)
+         --  We only need to encode lower byte, rest is 0
+         Update
+           (Ctx,
+            Stream_Element_Array'
+              (0 .. 6 => 0, 7 => Stream_Element (Final_Count)));
+      end if;
+
+      declare
+         --  Hacky asf, TODO: fix
+         Temporary : Digest;
+         for Temporary'Address use Ctx.State'Address;
+      begin
+         Output := Temporary;
+      end;
    end Finalize;
 
    function Hash (Input : String) return Digest is
@@ -59,11 +98,11 @@ package body SHA1 is
 
       W : Words (0 .. 79);
 
-      A         : Unsigned_32 := Ctx.H0;
-      B         : Unsigned_32 := Ctx.H1;
-      C         : Unsigned_32 := Ctx.H2;
-      D         : Unsigned_32 := Ctx.H3;
-      E         : Unsigned_32 := Ctx.H4;
+      A         : Unsigned_32 := Ctx.State (0);
+      B         : Unsigned_32 := Ctx.State (1);
+      C         : Unsigned_32 := Ctx.State (2);
+      D         : Unsigned_32 := Ctx.State (3);
+      E         : Unsigned_32 := Ctx.State (4);
       Temporary : Unsigned_32;
    begin
       declare
@@ -125,11 +164,11 @@ package body SHA1 is
          A := Temporary;
       end loop;
 
-      Ctx.H0 := Ctx.H0 + A;
-      Ctx.H1 := Ctx.H1 + B;
-      Ctx.H2 := Ctx.H2 + C;
-      Ctx.H3 := Ctx.H3 + D;
-      Ctx.H4 := Ctx.H4 + E;
+      Ctx.State (0) := Ctx.State (0) + A;
+      Ctx.State (1) := Ctx.State (1) + B;
+      Ctx.State (2) := Ctx.State (2) + C;
+      Ctx.State (3) := Ctx.State (3) + D;
+      Ctx.State (4) := Ctx.State (4) + E;
    end Transform;
 
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32 is
