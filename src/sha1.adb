@@ -30,14 +30,15 @@ package body SHA1 is
       loop
          Buffer_First := Ctx.Count rem Block_Length;
          Buffer_Last  :=
-           Stream_Element_Offset'Min (Input'Last - Current, Ctx.Buffer'Last);
+           Stream_Element_Offset'Min
+             (Buffer_First + Input'Last - Current, Ctx.Buffer'Last);
          Ctx.Buffer (Buffer_First .. Buffer_Last) :=
-           Input (Current .. Current + Buffer_Last);
+           Input (Current .. Current + Buffer_Last - Buffer_First);
          Current   := Current + Buffer_Last + 1;
-         Ctx.Count := Ctx.Count + Buffer_Last - Buffer_First;
+         Ctx.Count := Ctx.Count + Buffer_Last - Buffer_First + 1;
 
          if Buffer_Last = Ctx.Buffer'Last then --  Full chunk ready
-            Transform (Ctx, Ctx.Buffer);
+            Transform (Ctx);
          end if;
 
          exit when Current > Input'Last;
@@ -52,31 +53,37 @@ package body SHA1 is
    end Finalize;
 
    procedure Finalize (Ctx : in out Context; Output : out Digest) is
-      Final_Count : Stream_Element_Offset := (Ctx.Count rem Block_Length);
+      Final_Count : constant Stream_Element_Offset :=
+        (Ctx.Count rem Block_Length);
+      Current : Stream_Element_Offset := Output'First;
    begin
-      if Final_Count /= 0 then
+      if Final_Count /= 0 or else Ctx.Count = 0 then
          --  Insert padding
          Update (Ctx, Stream_Element_Array'(0 => 16#80#));
 
-         for I in 0 .. (Block_Length - Final_Count - 5) loop
+         for I in 1 .. (Block_Length - Final_Count - 9) loop
             Update (Ctx, Stream_Element_Array'(0 => 0));
          end loop;
 
          --  Since we know that Final_Count < Block_Length (64)
-         --  We only need to encode lower byte, rest is 0
+         --  We only need to encode lower bytes, rest is 0
          Update
            (Ctx,
             Stream_Element_Array'
-              (0 .. 6 => 0, 7 => Stream_Element (Final_Count)));
+              (0 .. 5 => 0, 6 => Stream_Element ((Final_Count * 8) / 256),
+               7      => Stream_Element ((Final_Count * 8) rem 256)));
       end if;
 
-      declare
-         --  Hacky asf, TODO: fix
-         Temporary : Digest;
-         for Temporary'Address use Ctx.State'Address;
-      begin
-         Output := Temporary;
-      end;
+      for H of Ctx.State loop
+         Output (Current + 0) :=
+           Stream_Element (Shift_Right (H, 24) and 16#FF#);
+         Output (Current + 1) :=
+           Stream_Element (Shift_Right (H, 16) and 16#FF#);
+         Output (Current + 2) :=
+           Stream_Element (Shift_Right (H, 8) and 16#FF#);
+         Output (Current + 3) := Stream_Element (H and 16#FF#);
+         Current              := Current + 4;
+      end loop;
    end Finalize;
 
    function Hash (Input : String) return Digest is
@@ -93,7 +100,7 @@ package body SHA1 is
       return Finalize (Ctx);
    end Hash;
 
-   procedure Transform (Ctx : in out Context; Buffer : Block) is
+   procedure Transform (Ctx : in out Context) is
       type Words is array (Natural range <>) of Unsigned_32;
 
       W : Words (0 .. 79);
@@ -106,14 +113,14 @@ package body SHA1 is
       Temporary : Unsigned_32;
    begin
       declare
-         J : Stream_Element_Offset := Buffer'First;
+         J : Stream_Element_Offset := Ctx.Buffer'First;
       begin
          for I in 0 .. 15 loop
             W (I) :=
-              Shift_Left (Unsigned_32 (Buffer (J + 0)), 24) or
-              Shift_Left (Unsigned_32 (Buffer (J + 1)), 16) or
-              Shift_Left (Unsigned_32 (Buffer (J + 2)), 8) or
-              Unsigned_32 (Buffer (J + 3));
+              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 0)), 24) or
+              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 1)), 16) or
+              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 2)), 8) or
+              Unsigned_32 (Ctx.Buffer (J + 3));
             J := J + 4;
          end loop;
       end;

@@ -38,7 +38,7 @@ private
       Buffer : Block;
    end record;
 
-   procedure Transform (Ctx : in out Context; Buffer : Block);
+   procedure Transform (Ctx : in out Context);
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Parity (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32;
