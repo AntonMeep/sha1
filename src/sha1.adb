@@ -1,5 +1,8 @@
 pragma Ada_2012;
 
+with GNAT.Byte_Swapping;
+with System;
+
 package body SHA1 is
    function Initialize return Context is
       Ctx : Context;
@@ -39,7 +42,7 @@ package body SHA1 is
             Ctx.Count        := Ctx.Count + Bytes_To_Copy;
 
             if Ctx.Buffer'Last < Ctx.Buffer_Index then
-               Transform (Ctx.State, Ctx.Buffer);
+               Transform (Ctx);
                Ctx.Buffer_Index := Ctx.Buffer'First;
             end if;
          end;
@@ -104,27 +107,27 @@ package body SHA1 is
       return Finalize (Ctx);
    end Hash;
 
-   procedure Transform (State : in out State_Array; Buffer : Block) is
+   procedure Transform (Ctx : in out Context) is
       type Words is array (Natural range <>) of Unsigned_32;
 
       W : Words (0 .. 79);
 
-      A         : Unsigned_32 := State (0);
-      B         : Unsigned_32 := State (1);
-      C         : Unsigned_32 := State (2);
-      D         : Unsigned_32 := State (3);
-      E         : Unsigned_32 := State (4);
+      A         : Unsigned_32 := Ctx.State (0);
+      B         : Unsigned_32 := Ctx.State (1);
+      C         : Unsigned_32 := Ctx.State (2);
+      D         : Unsigned_32 := Ctx.State (3);
+      E         : Unsigned_32 := Ctx.State (4);
       Temporary : Unsigned_32;
    begin
       declare
-         J : Stream_Element_Offset := Buffer'First;
+         J : Stream_Element_Offset := Ctx.Buffer'First;
       begin
          for I in 0 .. 15 loop
             W (I) :=
-              Shift_Left (Unsigned_32 (Buffer (J + 0)), 24) or
-              Shift_Left (Unsigned_32 (Buffer (J + 1)), 16) or
-              Shift_Left (Unsigned_32 (Buffer (J + 2)), 8) or
-              Unsigned_32 (Buffer (J + 3));
+              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 0)), 24) or
+              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 1)), 16) or
+              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 2)), 8) or
+              Unsigned_32 (Ctx.Buffer (J + 3));
             J := J + 4;
          end loop;
       end;
@@ -175,11 +178,11 @@ package body SHA1 is
          A := Temporary;
       end loop;
 
-      State (0) := State (0) + A;
-      State (1) := State (1) + B;
-      State (2) := State (2) + C;
-      State (3) := State (3) + D;
-      State (4) := State (4) + E;
+      Ctx.State (0) := Ctx.State (0) + A;
+      Ctx.State (1) := Ctx.State (1) + B;
+      Ctx.State (2) := Ctx.State (2) + C;
+      Ctx.State (3) := Ctx.State (3) + D;
+      Ctx.State (4) := Ctx.State (4) + E;
    end Transform;
 
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32 is

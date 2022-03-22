@@ -40,7 +40,7 @@ private
       Buffer_Index : Stream_Element_Offset := 0;
    end record;
 
-   procedure Transform (State : in out State_Array; Buffer : Block);
+   procedure Transform (Ctx : in out Context);
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Parity (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32;
