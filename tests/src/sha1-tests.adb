@@ -17,6 +17,10 @@ package body SHA1.Tests is
         (Caller.Create
            (Name & "SHA1() - one million 'a' characters",
             SHA1_One_Million_Test'Access));
+      Test_Suite.Add_Test
+        (Caller.Create
+           (Name & "SHA1() - an extremely long 1GB string",
+            SHA1_Extremely_Long_Test'Access));
 
       return Test_Suite'Access;
    end Suite;
@@ -65,4 +69,21 @@ package body SHA1.Tests is
           16#65#, 16#34#, 16#01#, 16#6f#),
          "check hashing result");
    end SHA1_One_Million_Test;
+
+   procedure SHA1_Extremely_Long_Test (Object : in out Fixture) is
+      Ctx : Context := Initialize;
+   begin
+      for I in 1 .. 16_777_216 loop
+         Update
+           (Ctx,
+            "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno");
+      end loop;
+
+      Assert
+        (Finalize (Ctx) =
+         (16#77#, 16#89#, 16#f0#, 16#c9#, 16#ef#, 16#7b#, 16#fc#, 16#40#,
+          16#d9#, 16#33#, 16#11#, 16#14#, 16#3d#, 16#fb#, 16#e6#, 16#9e#,
+          16#20#, 16#17#, 16#f5#, 16#92#),
+         "check hashing result");
+   end SHA1_Extremely_Long_Test;
 end SHA1.Tests;

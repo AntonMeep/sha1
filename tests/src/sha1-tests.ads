@@ -8,4 +8,5 @@ private
 
    procedure SHA1_Test (Object : in out Fixture);
    procedure SHA1_One_Million_Test (Object : in out Fixture);
+   procedure SHA1_Extremely_Long_Test (Object : in out Fixture);
 end SHA1.Tests;
