@@ -56,33 +56,32 @@ package body SHA1_Generic is
 
    procedure Finalize (Ctx : in out Context; Output : out Digest) is
       Current     : Index          := Output'First;
-      Final_Count : constant Index := Ctx.Count * 8;
+      Final_Count : constant Index := Ctx.Count;
 
-      function Index_To_Big_Endian is new To_Big_Endian (Index);
-      function Unsigned32_To_Big_Endian is new To_Big_Endian (Unsigned_32);
+      function To_Big_Endian is new Modular_To_Big_Endian (Unsigned_32);
+      function To_Big_Endian is new Modular_To_Big_Endian (Unsigned_64);
    begin
       --  Insert padding
       Update (Ctx, Element_Array'(0 => 16#80#));
 
       if Ctx.Buffer'Last - Ctx.Buffer_Index < 8 then
+         --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx,
             Element_Array'(0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index) => 0));
       end if;
 
+      --  Fill rest of the data with zeroes
       Update
         (Ctx,
          Element_Array'(0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index - 8) => 0));
 
-      if Index'Size < 64 then
-         --  In case Index is not a 64-bit number
-         Update (Ctx, Element_Array'(0 .. (8 - Index'Size / 8 - 1) => 0));
-      end if;
-
-      Update (Ctx, Index_To_Big_Endian (Final_Count));
+      --  Notice how we first convert to Unsigned_64 and only then multyplying
+      --  This is because Index can be too small to fit the number of bits
+      Update (Ctx, To_Big_Endian (Unsigned_64 (Final_Count) * 8));
 
       for H of Ctx.State loop
-         Output (Current + 0 .. Current + 3) := Unsigned32_To_Big_Endian (H);
+         Output (Current + 0 .. Current + 3) := To_Big_Endian (H);
          Current                             := Current + 4;
       end loop;
    end Finalize;
@@ -190,11 +189,11 @@ package body SHA1_Generic is
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32 is
      ((X and Y) xor (X and Z) xor (Y and Z));
 
-   function To_Big_Endian (Input : Input_Type) return Element_Array is
+   function Modular_To_Big_Endian (Input : Input_Type) return Element_Array is
       use GNAT.Byte_Swapping;
       use System;
 
-      subtype Output_Type is Element_Array (0 .. (Input_Type'Size / 8) - 1);
+      subtype Output_Type is Element_Array (0 .. Input_Type'Size / 8 - 1);
       function Convert is new Ada.Unchecked_Conversion
         (Input_Type, Output_Type);
 
@@ -210,5 +209,5 @@ package body SHA1_Generic is
          end if;
       end if;
       return Result;
-   end To_Big_Endian;
+   end Modular_To_Big_Endian;
 end SHA1_Generic;
