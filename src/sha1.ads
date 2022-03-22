@@ -34,11 +34,13 @@ private
       State : State_Array :=
         (16#6745_2301#, 16#EFCD_AB89#, 16#98BA_DCFE#, 16#1032_5476#,
          16#C3D2_E1F0#);
-      Count  : Stream_Element_Offset := 0;
-      Buffer : Block;
+
+      Count        : Stream_Element_Offset := 0;
+      Buffer       : Block;
+      Buffer_Index : Stream_Element_Offset := 0;
    end record;
 
-   procedure Transform (Ctx : in out Context);
+   procedure Transform (State : in out State_Array; Buffer : Block);
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Parity (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32;

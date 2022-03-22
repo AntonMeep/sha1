@@ -23,25 +23,26 @@ package body SHA1 is
    end Update;
 
    procedure Update (Ctx : in out Context; Input : Stream_Element_Array) is
-      Buffer_First : Stream_Element_Offset;
-      Buffer_Last  : Stream_Element_Offset;
-      Current      : Stream_Element_Offset := Input'First;
+      Current : Stream_Element_Offset := Input'First;
    begin
-      loop
-         Buffer_First := Ctx.Count rem Block_Length;
-         Buffer_Last  :=
-           Stream_Element_Offset'Min
-             (Buffer_First + Input'Last - Current, Ctx.Buffer'Last);
-         Ctx.Buffer (Buffer_First .. Buffer_Last) :=
-           Input (Current .. Current + Buffer_Last - Buffer_First);
-         Current   := Current + Buffer_Last + 1;
-         Ctx.Count := Ctx.Count + Buffer_Last - Buffer_First + 1;
+      while Current <= Input'Last loop
+         declare
+            Bytes_To_Copy : constant Stream_Element_Offset :=
+              Stream_Element_Offset'Min
+                (Input'Length - (Current - Input'First), Block_Length);
+         begin
+            Ctx.Buffer
+              (Ctx.Buffer_Index .. Ctx.Buffer_Index + Bytes_To_Copy - 1) :=
+              Input (Current .. Current + Bytes_To_Copy - 1);
+            Current          := Current + Bytes_To_Copy;
+            Ctx.Buffer_Index := Ctx.Buffer_Index + Bytes_To_Copy;
+            Ctx.Count        := Ctx.Count + Bytes_To_Copy;
 
-         if Buffer_Last = Ctx.Buffer'Last then --  Full chunk ready
-            Transform (Ctx);
-         end if;
-
-         exit when Current > Input'Last;
+            if Ctx.Buffer'Last < Ctx.Buffer_Index then
+               Transform (Ctx.State, Ctx.Buffer);
+               Ctx.Buffer_Index := Ctx.Buffer'First;
+            end if;
+         end;
       end loop;
    end Update;
 
@@ -53,25 +54,24 @@ package body SHA1 is
    end Finalize;
 
    procedure Finalize (Ctx : in out Context; Output : out Digest) is
-      Final_Count : constant Stream_Element_Offset :=
-        (Ctx.Count rem Block_Length);
-      Current : Stream_Element_Offset := Output'First;
+      Current     : Stream_Element_Offset          := Output'First;
+      Final_Count : constant Stream_Element_Offset := Ctx.Count;
    begin
       --  Insert padding
       Update (Ctx, Stream_Element_Array'(0 => 16#80#));
 
-      for I in 1 .. (Block_Length - Final_Count - 9) loop
-         Update (Ctx, Stream_Element_Array'(0 => 0));
-      end loop;
-
-      if Final_Count + 8 >= Block_Length then
-         for I in 1 .. (Block_Length - Final_Count) + (Block_Length - 9) loop
-            Update (Ctx, Stream_Element_Array'(0 => 0));
-         end loop;
+      if Ctx.Buffer'Last - Ctx.Buffer_Index < 8 then
+         Update
+           (Ctx,
+            Stream_Element_Array'
+              (0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index) => 0));
       end if;
 
-      --  Since we know that Final_Count < Block_Length (64)
-      --  We only need to encode lower bytes, rest is 0
+      Update
+        (Ctx,
+         Stream_Element_Array'
+           (0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index - 8) => 0));
+
       Update
         (Ctx,
          Stream_Element_Array'
@@ -104,27 +104,27 @@ package body SHA1 is
       return Finalize (Ctx);
    end Hash;
 
-   procedure Transform (Ctx : in out Context) is
+   procedure Transform (State : in out State_Array; Buffer : Block) is
       type Words is array (Natural range <>) of Unsigned_32;
 
       W : Words (0 .. 79);
 
-      A         : Unsigned_32 := Ctx.State (0);
-      B         : Unsigned_32 := Ctx.State (1);
-      C         : Unsigned_32 := Ctx.State (2);
-      D         : Unsigned_32 := Ctx.State (3);
-      E         : Unsigned_32 := Ctx.State (4);
+      A         : Unsigned_32 := State (0);
+      B         : Unsigned_32 := State (1);
+      C         : Unsigned_32 := State (2);
+      D         : Unsigned_32 := State (3);
+      E         : Unsigned_32 := State (4);
       Temporary : Unsigned_32;
    begin
       declare
-         J : Stream_Element_Offset := Ctx.Buffer'First;
+         J : Stream_Element_Offset := Buffer'First;
       begin
          for I in 0 .. 15 loop
             W (I) :=
-              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 0)), 24) or
-              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 1)), 16) or
-              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 2)), 8) or
-              Unsigned_32 (Ctx.Buffer (J + 3));
+              Shift_Left (Unsigned_32 (Buffer (J + 0)), 24) or
+              Shift_Left (Unsigned_32 (Buffer (J + 1)), 16) or
+              Shift_Left (Unsigned_32 (Buffer (J + 2)), 8) or
+              Unsigned_32 (Buffer (J + 3));
             J := J + 4;
          end loop;
       end;
@@ -175,11 +175,11 @@ package body SHA1 is
          A := Temporary;
       end loop;
 
-      Ctx.State (0) := Ctx.State (0) + A;
-      Ctx.State (1) := Ctx.State (1) + B;
-      Ctx.State (2) := Ctx.State (2) + C;
-      Ctx.State (3) := Ctx.State (3) + D;
-      Ctx.State (4) := Ctx.State (4) + E;
+      State (0) := State (0) + A;
+      State (1) := State (1) + B;
+      State (2) := State (2) + C;
+      State (3) := State (3) + D;
+      State (4) := State (4) + E;
    end Transform;
 
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32 is
