@@ -1,0 +1,19 @@
+name = "sha1_tests"
+description = "Test suite for SHA1"
+version = "0.0.0"
+
+authors = ["Anton Fediushin"]
+maintainers = ["Anton Fediushin <imantonmeep@gmail.com>"]
+maintainers-logins = ["AntonMeep"]
+
+executables = ["sha1_tests"]
+
+[configuration]
+disabled = true
+
+[[depends-on]]
+aunit = "^22.0.0"
+sha1 = "*"
+
+[[pins]]
+sha1 = { path = "../" }
