@@ -44,4 +44,9 @@ private
    function Ch (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Parity (X, Y, Z : Unsigned_32) return Unsigned_32;
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32;
+
+   function To_Big_Endian
+     (Input : Stream_Element_Offset) return Stream_Element_Array;
+   function To_Big_Endian (Input : Unsigned_32) return Stream_Element_Array;
+   function From_Big_Endian (Input : Stream_Element_Array) return Unsigned_32;
 end SHA1;

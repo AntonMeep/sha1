@@ -1,5 +1,6 @@
 pragma Ada_2012;
 
+with Ada.Unchecked_Conversion;
 with GNAT.Byte_Swapping;
 with System;
 
@@ -75,21 +76,11 @@ package body SHA1 is
          Stream_Element_Array'
            (0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index - 8) => 0));
 
-      Update
-        (Ctx,
-         Stream_Element_Array'
-           (0 .. 5 => 0, 6 => Stream_Element ((Final_Count * 8) / 256),
-            7      => Stream_Element ((Final_Count * 8) rem 256)));
+      Update (Ctx, To_Big_Endian (Final_Count * 8));
 
       for H of Ctx.State loop
-         Output (Current + 0) :=
-           Stream_Element (Shift_Right (H, 24) and 16#FF#);
-         Output (Current + 1) :=
-           Stream_Element (Shift_Right (H, 16) and 16#FF#);
-         Output (Current + 2) :=
-           Stream_Element (Shift_Right (H, 8) and 16#FF#);
-         Output (Current + 3) := Stream_Element (H and 16#FF#);
-         Current              := Current + 4;
+         Output (Current + 0 .. Current + 3) := To_Big_Endian (H);
+         Current                             := Current + 4;
       end loop;
    end Finalize;
 
@@ -123,12 +114,8 @@ package body SHA1 is
          J : Stream_Element_Offset := Ctx.Buffer'First;
       begin
          for I in 0 .. 15 loop
-            W (I) :=
-              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 0)), 24) or
-              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 1)), 16) or
-              Shift_Left (Unsigned_32 (Ctx.Buffer (J + 2)), 8) or
-              Unsigned_32 (Ctx.Buffer (J + 3));
-            J := J + 4;
+            W (I) := From_Big_Endian (Ctx.Buffer (J .. J + 3));
+            J     := J + 4;
          end loop;
       end;
 
@@ -191,4 +178,54 @@ package body SHA1 is
      (X xor Y xor Z);
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32 is
      ((X and Y) xor (X and Z) xor (Y and Z));
+
+   function To_Big_Endian
+     (Input : Stream_Element_Offset) return Stream_Element_Array
+   is
+      use GNAT.Byte_Swapping;
+      use System;
+
+      subtype Output_Type is Stream_Element_Array (0 .. 7);
+      function Convert is new Ada.Unchecked_Conversion
+        (Stream_Element_Offset, Output_Type);
+
+      Result : Output_Type := Convert (Input);
+   begin
+      if Default_Bit_Order /= High_Order_First then
+         Swap8 (Result'Address);
+      end if;
+      return Result;
+   end To_Big_Endian;
+
+   function To_Big_Endian (Input : Unsigned_32) return Stream_Element_Array is
+      use GNAT.Byte_Swapping;
+      use System;
+
+      subtype Output_Type is Stream_Element_Array (0 .. 3);
+      function Convert is new Ada.Unchecked_Conversion
+        (Unsigned_32, Output_Type);
+
+      Result : Output_Type := Convert (Input);
+   begin
+      if Default_Bit_Order /= High_Order_First then
+         Swap4 (Result'Address);
+      end if;
+      return Result;
+   end To_Big_Endian;
+
+   function From_Big_Endian (Input : Stream_Element_Array) return Unsigned_32
+   is
+      use GNAT.Byte_Swapping;
+      use System;
+
+      function Convert is new Ada.Unchecked_Conversion
+        (Stream_Element_Array, Unsigned_32);
+
+      Result : Unsigned_32 := Convert (Input);
+   begin
+      if Default_Bit_Order /= High_Order_First then
+         Swap4 (Result'Address);
+      end if;
+      return Result;
+   end From_Big_Endian;
 end SHA1;
