@@ -1,7 +1,7 @@
 with AUnit.Test_Fixtures;
 with AUnit.Test_Suites;
 
-package SHA1.Tests is
+package SHA1_Streams_Tests is
    function Suite return AUnit.Test_Suites.Access_Test_Suite;
 private
    type Fixture is new AUnit.Test_Fixtures.Test_Fixture with null record;
@@ -9,4 +9,4 @@ private
    procedure SHA1_Test (Object : in out Fixture);
    procedure SHA1_One_Million_Test (Object : in out Fixture);
    procedure SHA1_Extremely_Long_Test (Object : in out Fixture);
-end SHA1.Tests;
+end SHA1_Streams_Tests;

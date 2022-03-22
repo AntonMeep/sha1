@@ -3,13 +3,16 @@ pragma Ada_2012;
 with AUnit.Assertions; use AUnit.Assertions;
 with AUnit.Test_Caller;
 
-package body SHA1.Tests is
+with Ada.Streams; use Ada.Streams;
+with SHA1;        use SHA1;
+
+package body SHA1_Streams_Tests is
    package Caller is new AUnit.Test_Caller (Fixture);
 
    Test_Suite : aliased AUnit.Test_Suites.Test_Suite;
 
    function Suite return AUnit.Test_Suites.Access_Test_Suite is
-      Name : constant String := "[SHA1] ";
+      Name : constant String := "[SHA1 - Ada.Streams] ";
    begin
       Test_Suite.Add_Test
         (Caller.Create (Name & "SHA1() - normal", SHA1_Test'Access));
@@ -86,4 +89,4 @@ package body SHA1.Tests is
           16#20#, 16#17#, 16#f5#, 16#92#),
          "check hashing result");
    end SHA1_Extremely_Long_Test;
-end SHA1.Tests;
+end SHA1_Streams_Tests;
