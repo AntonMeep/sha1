@@ -29,19 +29,17 @@ package body SHA1_Generic is
    begin
       while Current <= Input'Last loop
          declare
+            Buffer_Index  : constant Index := Ctx.Count rem Block_Length;
             Bytes_To_Copy : constant Index :=
               Index'Min (Input'Length - (Current - Input'First), Block_Length);
          begin
-            Ctx.Buffer
-              (Ctx.Buffer_Index .. Ctx.Buffer_Index + Bytes_To_Copy - 1) :=
+            Ctx.Buffer (Buffer_Index .. Buffer_Index + Bytes_To_Copy - 1) :=
               Input (Current .. Current + Bytes_To_Copy - 1);
-            Current          := Current + Bytes_To_Copy;
-            Ctx.Buffer_Index := Ctx.Buffer_Index + Bytes_To_Copy;
-            Ctx.Count        := Ctx.Count + Bytes_To_Copy;
+            Current   := Current + Bytes_To_Copy;
+            Ctx.Count := Ctx.Count + Bytes_To_Copy;
 
-            if Ctx.Buffer'Last < Ctx.Buffer_Index then
+            if Ctx.Buffer'Last < Buffer_Index + Bytes_To_Copy then
                Transform (Ctx);
-               Ctx.Buffer_Index := Ctx.Buffer'First;
             end if;
          end;
       end loop;
@@ -64,17 +62,19 @@ package body SHA1_Generic is
       --  Insert padding
       Update (Ctx, Element_Array'(0 => 16#80#));
 
-      if Ctx.Buffer'Last - Ctx.Buffer_Index < 8 then
+      if Ctx.Buffer'Last - (Ctx.Count rem Block_Length) < 8 then
          --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx,
-            Element_Array'(0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index) => 0));
+            Element_Array'
+              (0 .. (Ctx.Buffer'Last - (Ctx.Count rem Block_Length)) => 0));
       end if;
 
       --  Fill rest of the data with zeroes
       Update
         (Ctx,
-         Element_Array'(0 .. (Ctx.Buffer'Last - Ctx.Buffer_Index - 8) => 0));
+         Element_Array'
+           (0 .. (Ctx.Buffer'Last - (Ctx.Count rem Block_Length) - 8) => 0));
 
       --  Notice how we first convert to Unsigned_64 and only then multyplying
       --  This is because Index can be too small to fit the number of bits

@@ -82,9 +82,8 @@ private
         (16#6745_2301#, 16#EFCD_AB89#, 16#98BA_DCFE#, 16#1032_5476#,
          16#C3D2_E1F0#);
 
-      Count        : Index := 0;
-      Buffer       : Block;
-      Buffer_Index : Index := 0;
+      Count  : Index := 0;
+      Buffer : Block;
    end record;
 
    procedure Transform (Ctx : in out Context);
