@@ -73,9 +73,8 @@ package body SHA1_Generic is
          Element_Array'
            (0 .. (Ctx.Buffer'Last - (Ctx.Count rem Block_Length) - 8) => 0));
 
-      --  Notice how we first convert to Unsigned_64 and only then multyplying
-      --  This is because Index can be too small to fit the number of bits
-      Update (Ctx, To_Big_Endian (Unsigned_64 (Final_Count) * 8));
+      --  Shift_Left(X, 3) is equivalent to multiplyng by 8
+      Update (Ctx, To_Big_Endian (Shift_Left (Unsigned_64 (Final_Count), 3)));
 
       for H of Ctx.State loop
          Output (Current + 0 .. Current + 3) := To_Big_Endian (H);
