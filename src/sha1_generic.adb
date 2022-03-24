@@ -6,15 +6,11 @@ with System;
 
 package body SHA1_Generic is
    function Initialize return Context is
-      Ctx : Context;
-   begin
-      return Ctx;
-   end Initialize;
+      ((State => <>, Count => 0, Buffer => (others => <>)));
 
    procedure Initialize (Ctx : out Context) is
-      Result : Context;
    begin
-      Ctx := Result;
+      Ctx := Initialize;
    end Initialize;
 
    procedure Update (Ctx : in out Context; Input : String) is
