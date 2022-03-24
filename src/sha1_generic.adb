@@ -6,7 +6,7 @@ with System;
 
 package body SHA1_Generic is
    function Initialize return Context is
-      ((State => <>, Count => 0, Buffer => (others => <>)));
+     ((State => <>, Count => 0, Buffer => (others => <>)));
 
    procedure Initialize (Ctx : out Context) is
    begin
@@ -16,6 +16,7 @@ package body SHA1_Generic is
    procedure Update (Ctx : in out Context; Input : String) is
       Buffer : Element_Array (Index (Input'First) .. Index (Input'Last));
       for Buffer'Address use Input'Address;
+      pragma Import (Ada, Buffer);
    begin
       Update (Ctx, Buffer);
    end Update;
@@ -114,6 +115,7 @@ package body SHA1_Generic is
 
          Buffer_Words : Words (0 .. 15);
          for Buffer_Words'Address use Ctx.Buffer'Address;
+         pragma Import (Ada, Buffer_Words);
       begin
          W (0 .. 15) := Buffer_Words;
 
