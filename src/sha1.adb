@@ -1,10 +1,9 @@
 pragma Ada_2012;
 
-with Ada.Unchecked_Conversion;
-with GNAT.Byte_Swapping;
+with Endianness.Interfaces;
 with System;
 
-package body SHA1_Generic is
+package body SHA1 is
    function Initialize return Context is
      ((State => <>, Count => 0, Buffer => (others => <>)));
 
@@ -14,21 +13,25 @@ package body SHA1_Generic is
    end Initialize;
 
    procedure Update (Ctx : in out Context; Input : String) is
-      Buffer : Element_Array (Index (Input'First) .. Index (Input'Last));
+      Buffer : Stream_Element_Array
+        (Stream_Element_Offset (Input'First) ..
+             Stream_Element_Offset (Input'Last));
       for Buffer'Address use Input'Address;
       pragma Import (Ada, Buffer);
    begin
       Update (Ctx, Buffer);
    end Update;
 
-   procedure Update (Ctx : in out Context; Input : Element_Array) is
-      Current : Index := Input'First;
+   procedure Update (Ctx : in out Context; Input : Stream_Element_Array) is
+      Current : Stream_Element_Offset := Input'First;
    begin
       while Current <= Input'Last loop
          declare
-            Buffer_Index  : constant Index := Ctx.Count rem Block_Length;
-            Bytes_To_Copy : constant Index :=
-              Index'Min (Input'Length - (Current - Input'First), Block_Length);
+            Buffer_Index : constant Stream_Element_Offset :=
+              Ctx.Count rem Block_Length;
+            Bytes_To_Copy : constant Stream_Element_Offset :=
+              Stream_Element_Offset'Min
+                (Input'Length - (Current - Input'First), Block_Length);
          begin
             Ctx.Buffer (Buffer_Index .. Buffer_Index + Bytes_To_Copy - 1) :=
               Input (Current .. Current + Bytes_To_Copy - 1);
@@ -50,34 +53,35 @@ package body SHA1_Generic is
    end Finalize;
 
    procedure Finalize (Ctx : in out Context; Output : out Digest) is
-      Current     : Index          := Output'First;
-      Final_Count : constant Index := Ctx.Count;
+      use Endianness.Interfaces;
 
-      function To_Big_Endian is new Modular_To_Big_Endian (Unsigned_32);
-      function To_Big_Endian is new Modular_To_Big_Endian (Unsigned_64);
+      Current     : Stream_Element_Offset          := Output'First;
+      Final_Count : constant Stream_Element_Offset := Ctx.Count;
    begin
       --  Insert padding
-      Update (Ctx, Element_Array'(0 => 16#80#));
+      Update (Ctx, Stream_Element_Array'(0 => 16#80#));
 
       if Ctx.Buffer'Last - (Ctx.Count rem Block_Length) < 8 then
          --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx,
-            Element_Array'
+            Stream_Element_Array'
               (0 .. (Ctx.Buffer'Last - (Ctx.Count rem Block_Length)) => 0));
       end if;
 
       --  Fill rest of the data with zeroes
       Update
         (Ctx,
-         Element_Array'
+         Stream_Element_Array'
            (0 .. (Ctx.Buffer'Last - (Ctx.Count rem Block_Length) - 8) => 0));
 
       --  Shift_Left(X, 3) is equivalent to multiplyng by 8
-      Update (Ctx, To_Big_Endian (Shift_Left (Unsigned_64 (Final_Count), 3)));
+      Update
+        (Ctx,
+         Native_To_Big_Endian (Shift_Left (Unsigned_64 (Final_Count), 3)));
 
       for H of Ctx.State loop
-         Output (Current + 0 .. Current + 3) := To_Big_Endian (H);
+         Output (Current + 0 .. Current + 3) := Native_To_Big_Endian (H);
          Current                             := Current + 4;
       end loop;
    end Finalize;
@@ -89,7 +93,7 @@ package body SHA1_Generic is
       return Finalize (Ctx);
    end Hash;
 
-   function Hash (Input : Element_Array) return Digest is
+   function Hash (Input : Stream_Element_Array) return Digest is
       Ctx : Context := Initialize;
    begin
       Update (Ctx, Input);
@@ -109,7 +113,7 @@ package body SHA1_Generic is
       Temporary : Unsigned_32;
    begin
       declare
-         use GNAT.Byte_Swapping;
+         use Endianness.Interfaces;
          use System;
 
          Buffer_Words : Words (0 .. 15);
@@ -119,9 +123,8 @@ package body SHA1_Generic is
          W (0 .. 15) := Buffer_Words;
 
          if Default_Bit_Order /= High_Order_First then
-            --  Take care of endianess
-            for I in W'Range loop
-               Swap4 (W (I)'Address);
+            for WW of W loop
+               WW := Swap_Endian (WW);
             end loop;
          end if;
       end;
@@ -185,26 +188,4 @@ package body SHA1_Generic is
      (X xor Y xor Z);
    function Maj (X, Y, Z : Unsigned_32) return Unsigned_32 is
      ((X and Y) xor (X and Z) xor (Y and Z));
-
-   function Modular_To_Big_Endian (Input : Input_Type) return Element_Array is
-      use GNAT.Byte_Swapping;
-      use System;
-
-      subtype Output_Type is Element_Array (0 .. Input_Type'Size / 8 - 1);
-      function Convert is new Ada.Unchecked_Conversion
-        (Input_Type, Output_Type);
-
-      Result : Output_Type := Convert (Input);
-   begin
-      if Default_Bit_Order /= High_Order_First then
-         if Input_Type'Size = 32 then
-            Swap4 (Result'Address);
-         elsif Input_Type'Size = 64 then
-            Swap8 (Result'Address);
-         else
-            raise Program_Error;
-         end if;
-      end if;
-      return Result;
-   end Modular_To_Big_Endian;
-end SHA1_Generic;
+end SHA1;

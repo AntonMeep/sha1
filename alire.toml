@@ -8,3 +8,9 @@ tags = ["cryptography", "security", "sha1"]
 authors = ["Anton Fediushin"]
 maintainers = ["Anton Fediushin <imantonmeep@gmail.com>"]
 maintainers-logins = ["AntonMeep"]
+
+[[depends-on]]
+endianness = "^1.0.0"
+
+[[pins]]
+endianness = { path = "../endianness" }
