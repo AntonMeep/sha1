@@ -295,11 +295,4 @@ package body SHA1 is
       Ctx.State (3) := Ctx.State (3) + D;
       Ctx.State (4) := Ctx.State (4) + E;
    end Transform;
-
-   function Ch (X, Y, Z : Unsigned_32) return Unsigned_32 is
-     ((X and Y) xor ((not X) and Z));
-   function Parity (X, Y, Z : Unsigned_32) return Unsigned_32 is
-     (X xor Y xor Z);
-   function Maj (X, Y, Z : Unsigned_32) return Unsigned_32 is
-     ((X and Y) xor (X and Z) xor (Y and Z));
 end SHA1;

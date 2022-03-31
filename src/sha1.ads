@@ -69,10 +69,4 @@ private
       Count  : Stream_Element_Offset := 0;
       Buffer : Block;
    end record;
-
-   procedure Transform (Ctx : in out Context);
-   function Ch (X, Y, Z : Unsigned_32) return Unsigned_32;
-   function Parity (X, Y, Z : Unsigned_32) return Unsigned_32;
-   function Maj (X, Y, Z : Unsigned_32) return Unsigned_32;
-   pragma Inline (Transform, Ch, Parity, Maj);
 end SHA1;
