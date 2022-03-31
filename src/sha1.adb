@@ -29,7 +29,7 @@ package body SHA1 is
       while Current <= Input'Last loop
          declare
             Buffer_Index : constant Stream_Element_Offset :=
-              Fast_Rem (Ctx.Count, Block_Length);
+              Ctx.Count rem Block_Length;
             Bytes_To_Copy : constant Stream_Element_Offset :=
               Stream_Element_Offset'Min
                 (Input'Length - (Current - Input'First), Block_Length);
@@ -64,14 +64,12 @@ package body SHA1 is
       --  Insert padding
       Update (Ctx_Copy, Stream_Element_Array'(0 => 16#80#));
 
-      if Ctx_Copy.Buffer'Last - Fast_Rem (Ctx.Count, Block_Length) < 8 then
+      if Ctx_Copy.Buffer'Last - (Ctx.Count rem Block_Length) < 8 then
          --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx_Copy,
             Stream_Element_Array'
-              (0 ..
-                   (Ctx_Copy.Buffer'Last -
-                    Fast_Rem (Ctx.Count, Block_Length)) =>
+              (0 .. (Ctx_Copy.Buffer'Last - (Ctx.Count rem Block_Length)) =>
                  0));
       end if;
 
@@ -79,9 +77,7 @@ package body SHA1 is
       Update
         (Ctx_Copy,
          Stream_Element_Array'
-           (0 ..
-                (Ctx_Copy.Buffer'Last - Fast_Rem (Ctx.Count, Block_Length) -
-                 8) =>
+           (0 .. (Ctx_Copy.Buffer'Last - (Ctx.Count rem Block_Length) - 8) =>
               0));
 
       --  Shift_Left(X, 3) is equivalent to multiplyng by 8
@@ -295,24 +291,4 @@ package body SHA1 is
       Ctx.State (3) := Ctx.State (3) + D;
       Ctx.State (4) := Ctx.State (4) + E;
    end Transform;
-
-   function Fast_Rem
-     (A, B : Stream_Element_Offset) return Stream_Element_Offset
-   is
-      A_X : Unsigned_64;
-      for A_X'Address use A'Address;
-      pragma Import (Ada, A_X);
-
-      B_X : Unsigned_64;
-      for B_X'Address use B'Address;
-      pragma Import (Ada, B_X);
-
-      X : Unsigned_64 := A_X and (B_X - 1);
-
-      Result : Stream_Element_Offset;
-      for Result'Address use X'Address;
-      pragma Import (Ada, Result);
-   begin
-      return Result;
-   end Fast_Rem;
 end SHA1;
