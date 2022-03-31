@@ -11,6 +11,3 @@ maintainers-logins = ["AntonMeep"]
 
 [[depends-on]]
 endianness = "^1.0.0"
-
-[[pins]]
-endianness = { path = "../endianness" }
