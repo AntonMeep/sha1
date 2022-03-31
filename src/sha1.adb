@@ -1,7 +1,6 @@
 pragma Ada_2012;
 
-with Endianness;
-with Endianness.Interfaces;
+with GNAT.Byte_Swapping;
 with System;
 
 package body SHA1 is
@@ -32,7 +31,8 @@ package body SHA1 is
               Ctx.Count rem Block_Length;
             Bytes_To_Copy : constant Stream_Element_Offset :=
               Stream_Element_Offset'Min
-                (Input'Length - (Current - Input'First), Block_Length);
+                (Input'Length - (Current - Input'First),
+                 Ctx.Buffer'Last - Buffer_Index + 1);
          begin
             Ctx.Buffer (Buffer_Index .. Buffer_Index + Bytes_To_Copy - 1) :=
               Input (Current .. Current + Bytes_To_Copy - 1);
@@ -54,7 +54,8 @@ package body SHA1 is
    end Finalize;
 
    procedure Finalize (Ctx : Context; Output : out Digest) is
-      use Endianness.Interfaces;
+      use GNAT.Byte_Swapping;
+      use System;
 
       Current     : Stream_Element_Offset          := Output'First;
       Final_Count : constant Stream_Element_Offset := Ctx.Count;
@@ -64,12 +65,14 @@ package body SHA1 is
       --  Insert padding
       Update (Ctx_Copy, Stream_Element_Array'(0 => 16#80#));
 
-      if Ctx_Copy.Buffer'Last - (Ctx.Count rem Block_Length) < 8 then
+      if Ctx_Copy.Buffer'Last - (Ctx_Copy.Count rem Block_Length) < 8 then
          --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx_Copy,
             Stream_Element_Array'
-              (0 .. (Ctx_Copy.Buffer'Last - (Ctx.Count rem Block_Length)) =>
+              (0 ..
+                   (Ctx_Copy.Buffer'Last -
+                    (Ctx_Copy.Count rem Block_Length)) =>
                  0));
       end if;
 
@@ -77,17 +80,38 @@ package body SHA1 is
       Update
         (Ctx_Copy,
          Stream_Element_Array'
-           (0 .. (Ctx_Copy.Buffer'Last - (Ctx.Count rem Block_Length) - 8) =>
+           (0 ..
+                (Ctx_Copy.Buffer'Last - (Ctx_Copy.Count rem Block_Length) -
+                 8) =>
               0));
 
-      --  Shift_Left(X, 3) is equivalent to multiplyng by 8
-      Update
-        (Ctx_Copy,
-         Native_To_Big_Endian (Shift_Left (Unsigned_64 (Final_Count), 3)));
+      declare
+         --  Shift_Left(X, 3) is equivalent to multiplyng by 8
+         Byte_Length : Unsigned_64 :=
+           Shift_Left (Unsigned_64 (Final_Count), 3);
+
+         Byte_Length_Buffer : Stream_Element_Array (0 .. 7);
+         for Byte_Length_Buffer'Address use Byte_Length'Address;
+         pragma Import (Ada, Byte_Length_Buffer);
+      begin
+         if Default_Bit_Order /= High_Order_First then
+            Swap8 (Byte_Length_Buffer'Address);
+         end if;
+         Update (Ctx_Copy, Byte_Length_Buffer);
+      end;
 
       for H of Ctx_Copy.State loop
-         Output (Current + 0 .. Current + 3) := Native_To_Big_Endian (H);
-         Current                             := Current + 4;
+         declare
+            Buffer : Stream_Element_Array (0 .. 3);
+            for Buffer'Address use H'Address;
+            pragma Import (Ada, Buffer);
+         begin
+            if Default_Bit_Order /= High_Order_First then
+               Swap4 (Buffer'Address);
+            end if;
+            Output (Current + 0 .. Current + 3) := Buffer;
+            Current                             := Current + 4;
+         end;
       end loop;
    end Finalize;
 
@@ -117,25 +141,40 @@ package body SHA1 is
       E : Unsigned_32 := Ctx.State (4);
    begin
       declare
+         use GNAT.Byte_Swapping;
          use System;
 
          Buffer_Words : Words (0 .. 15);
          for Buffer_Words'Address use Ctx.Buffer'Address;
          pragma Import (Ada, Buffer_Words);
-
-         function Swap_Endian is new Endianness.Swap_Endian (Unsigned_32);
-         pragma Inline (Swap_Endian);
       begin
          W (0 .. 15) := Buffer_Words;
 
          if Default_Bit_Order /= High_Order_First then
             for I in Buffer_Words'Range loop
-               W (I) := Swap_Endian (W (I));
+               Swap4 (W (I)'Address);
             end loop;
          end if;
       end;
 
       declare
+         procedure SHA1_LOAD (I : Unsigned_32);
+         procedure SHA1_ROUND_0
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32);
+         procedure SHA1_ROUND_1
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32);
+         procedure SHA1_ROUND_2
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32);
+         procedure SHA1_ROUND_3
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32);
+         procedure SHA1_ROUND_4
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32);
+
          procedure SHA1_LOAD (I : Unsigned_32) is
          begin
             W (I and 15) :=
@@ -146,7 +185,8 @@ package body SHA1 is
          end SHA1_LOAD;
 
          procedure SHA1_ROUND_0
-           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32)
          is
          begin
             Z :=
@@ -156,7 +196,8 @@ package body SHA1 is
          end SHA1_ROUND_0;
 
          procedure SHA1_ROUND_1
-           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32)
          is
          begin
             SHA1_LOAD (I);
@@ -167,7 +208,8 @@ package body SHA1 is
          end SHA1_ROUND_1;
 
          procedure SHA1_ROUND_2
-           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32)
          is
          begin
             SHA1_LOAD (I);
@@ -178,7 +220,8 @@ package body SHA1 is
          end SHA1_ROUND_2;
 
          procedure SHA1_ROUND_3
-           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32)
          is
          begin
             SHA1_LOAD (I);
@@ -189,7 +232,8 @@ package body SHA1 is
          end SHA1_ROUND_3;
 
          procedure SHA1_ROUND_4
-           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+           (V :        Unsigned_32; U : in out Unsigned_32; X, Y : Unsigned_32;
+            Z : in out Unsigned_32; I : Unsigned_32)
          is
          begin
             SHA1_LOAD (I);
