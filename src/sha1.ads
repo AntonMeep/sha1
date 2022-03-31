@@ -69,4 +69,11 @@ private
       Count  : Stream_Element_Offset := 0;
       Buffer : Block;
    end record;
+
+   procedure Transform (Ctx : in out Context);
+   pragma Inline (Transform);
+
+   function Fast_Rem
+     (A, B : Stream_Element_Offset) return Stream_Element_Offset;
+   pragma Inline (Fast_Rem);
 end SHA1;
