@@ -41,14 +41,10 @@ is
    procedure Update (Ctx : in out Context; Input : Stream_Element_Array);
    --  Update Ctx with data from Input
 
-   function Finalize (Ctx : in out Context) return Digest;
+   function Finalize (Ctx : Context) return Digest;
    --  Compute hash value and return it.
-   --
-   --  Note: This modifies input Ctx, if you want to continue adding data to it
-   --  after calling Finalize, you should make a copy of it.
-   --  @return Hash of the data that was fed into Ctx
 
-   procedure Finalize (Ctx : in out Context; Output : out Digest);
+   procedure Finalize (Ctx : Context; Output : out Digest);
    --  Ditto, but as a procedure.
 
    function Hash (Input : String) return Digest;
