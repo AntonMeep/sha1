@@ -1,5 +1,6 @@
 pragma Ada_2012;
 
+with Endianness;
 with Endianness.Interfaces;
 with System;
 
@@ -113,19 +114,21 @@ package body SHA1 is
 
       W : Words (0 .. 79);
 
-      A         : Unsigned_32 := Ctx.State (0);
-      B         : Unsigned_32 := Ctx.State (1);
-      C         : Unsigned_32 := Ctx.State (2);
-      D         : Unsigned_32 := Ctx.State (3);
-      E         : Unsigned_32 := Ctx.State (4);
+      A : Unsigned_32 := Ctx.State (0);
+      B : Unsigned_32 := Ctx.State (1);
+      C : Unsigned_32 := Ctx.State (2);
+      D : Unsigned_32 := Ctx.State (3);
+      E : Unsigned_32 := Ctx.State (4);
    begin
       declare
-         use Endianness.Interfaces;
          use System;
 
          Buffer_Words : Words (0 .. 15);
          for Buffer_Words'Address use Ctx.Buffer'Address;
          pragma Import (Ada, Buffer_Words);
+
+         function Swap_Endian is new Endianness.Swap_Endian (Unsigned_32);
+         pragma Inline (Swap_Endian);
       begin
          W (0 .. 15) := Buffer_Words;
 
