@@ -1,6 +1,6 @@
 pragma Ada_2012;
 
-with GNAT.Byte_Swapping;
+with Endianness;
 with Endianness.Interfaces;
 with System;
 
@@ -121,18 +121,20 @@ package body SHA1 is
       E : Unsigned_32 := Ctx.State (4);
    begin
       declare
-         use GNAT.Byte_Swapping;
          use System;
 
          Buffer_Words : Words (0 .. 15);
          for Buffer_Words'Address use Ctx.Buffer'Address;
          pragma Import (Ada, Buffer_Words);
+
+         function Swap_Endian is new Endianness.Swap_Endian (Unsigned_32);
+         pragma Inline (Swap_Endian);
       begin
          W (0 .. 15) := Buffer_Words;
 
          if Default_Bit_Order /= High_Order_First then
             for I in Buffer_Words'Range loop
-               Swap4 (W (I)'Address);
+               W (I) := Swap_Endian (W (I));
             end loop;
          end if;
       end;
