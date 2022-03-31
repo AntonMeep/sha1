@@ -109,7 +109,7 @@ package body SHA1 is
    end Hash;
 
    procedure Transform (Ctx : in out Context) is
-      type Words is array (Natural range <>) of Unsigned_32;
+      type Words is array (Unsigned_32 range <>) of Unsigned_32;
 
       W : Words (0 .. 79);
 
@@ -118,7 +118,6 @@ package body SHA1 is
       C         : Unsigned_32 := Ctx.State (2);
       D         : Unsigned_32 := Ctx.State (3);
       E         : Unsigned_32 := Ctx.State (4);
-      Temporary : Unsigned_32;
    begin
       declare
          use Endianness.Interfaces;
@@ -137,51 +136,155 @@ package body SHA1 is
          end if;
       end;
 
-      for I in 16 .. 79 loop
-         W (I) :=
-           Rotate_Left
-             ((W (I - 3) xor W (I - 8) xor W (I - 14) xor W (I - 16)), 1);
-      end loop;
+      declare
+         procedure SHA1_LOAD (I : Unsigned_32) is
+         begin
+            W (I and 15) :=
+              Rotate_Left
+                (W ((I + 13) and 15) xor W ((I + 8) and 15) xor
+                 W ((I + 2) and 15) xor W (I and 15),
+                 1);
+         end SHA1_LOAD;
 
-      for I in 0 .. 19 loop
-         Temporary :=
-           Rotate_Left (A, 5) + Ch (B, C, D) + E + 16#5A82_7999# + W (I);
-         E := D;
-         D := C;
-         C := Rotate_Left (B, 30);
-         B := A;
-         A := Temporary;
-      end loop;
+         procedure SHA1_ROUND_0
+           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+         is
+         begin
+            Z :=
+              Z + ((U and (X xor Y)) xor Y) + W (I and 15) + 16#5a82_7999# +
+              Rotate_Left (V, 5);
+            U := Rotate_Left (U, 30);
+         end SHA1_ROUND_0;
 
-      for I in 20 .. 39 loop
-         Temporary :=
-           Rotate_Left (A, 5) + Parity (B, C, D) + E + 16#6ED9_EBA1# + W (I);
-         E := D;
-         D := C;
-         C := Rotate_Left (B, 30);
-         B := A;
-         A := Temporary;
-      end loop;
+         procedure SHA1_ROUND_1
+           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+         is
+         begin
+            SHA1_LOAD (I);
+            Z :=
+              Z + ((U and (X xor Y)) xor Y) + W (I and 15) + 16#5a82_7999# +
+              Rotate_Left (V, 5);
+            U := Rotate_Left (U, 30);
+         end SHA1_ROUND_1;
 
-      for I in 40 .. 59 loop
-         Temporary :=
-           Rotate_Left (A, 5) + Maj (B, C, D) + E + 16#8F1B_BCDC# + W (I);
-         E := D;
-         D := C;
-         C := Rotate_Left (B, 30);
-         B := A;
-         A := Temporary;
-      end loop;
+         procedure SHA1_ROUND_2
+           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+         is
+         begin
+            SHA1_LOAD (I);
+            Z :=
+              Z + (U xor X xor Y) + W (I and 15) + 16#6ed9_eba1# +
+              Rotate_Left (V, 5);
+            U := Rotate_Left (U, 30);
+         end SHA1_ROUND_2;
 
-      for I in 60 .. 79 loop
-         Temporary :=
-           Rotate_Left (A, 5) + Parity (B, C, D) + E + 16#CA62_C1D6# + W (I);
-         E := D;
-         D := C;
-         C := Rotate_Left (B, 30);
-         B := A;
-         A := Temporary;
-      end loop;
+         procedure SHA1_ROUND_3
+           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+         is
+         begin
+            SHA1_LOAD (I);
+            Z :=
+              Z + (((U or X) and Y) or (U and X)) + W (I and 15) +
+              16#8f1b_bcdc# + Rotate_Left (V, 5);
+            U := Rotate_Left (U, 30);
+         end SHA1_ROUND_3;
+
+         procedure SHA1_ROUND_4
+           (V, U, X, Y, Z : in out Unsigned_32; I : Unsigned_32)
+         is
+         begin
+            SHA1_LOAD (I);
+            Z :=
+              Z + (U xor X xor Y) + W (I and 15) + 16#ca62_c1d6# +
+              Rotate_Left (V, 5);
+            U := Rotate_Left (U, 30);
+         end SHA1_ROUND_4;
+
+         pragma Inline
+           (SHA1_LOAD, SHA1_ROUND_0, SHA1_ROUND_1, SHA1_ROUND_2, SHA1_ROUND_3,
+            SHA1_ROUND_4);
+      begin
+         SHA1_ROUND_0 (A, B, C, D, E, 0);
+         SHA1_ROUND_0 (E, A, B, C, D, 1);
+         SHA1_ROUND_0 (D, E, A, B, C, 2);
+         SHA1_ROUND_0 (C, D, E, A, B, 3);
+         SHA1_ROUND_0 (B, C, D, E, A, 4);
+         SHA1_ROUND_0 (A, B, C, D, E, 5);
+         SHA1_ROUND_0 (E, A, B, C, D, 6);
+         SHA1_ROUND_0 (D, E, A, B, C, 7);
+         SHA1_ROUND_0 (C, D, E, A, B, 8);
+         SHA1_ROUND_0 (B, C, D, E, A, 9);
+         SHA1_ROUND_0 (A, B, C, D, E, 10);
+         SHA1_ROUND_0 (E, A, B, C, D, 11);
+         SHA1_ROUND_0 (D, E, A, B, C, 12);
+         SHA1_ROUND_0 (C, D, E, A, B, 13);
+         SHA1_ROUND_0 (B, C, D, E, A, 14);
+         SHA1_ROUND_0 (A, B, C, D, E, 15);
+         SHA1_ROUND_1 (E, A, B, C, D, 16);
+         SHA1_ROUND_1 (D, E, A, B, C, 17);
+         SHA1_ROUND_1 (C, D, E, A, B, 18);
+         SHA1_ROUND_1 (B, C, D, E, A, 19);
+         SHA1_ROUND_2 (A, B, C, D, E, 20);
+         SHA1_ROUND_2 (E, A, B, C, D, 21);
+         SHA1_ROUND_2 (D, E, A, B, C, 22);
+         SHA1_ROUND_2 (C, D, E, A, B, 23);
+         SHA1_ROUND_2 (B, C, D, E, A, 24);
+         SHA1_ROUND_2 (A, B, C, D, E, 25);
+         SHA1_ROUND_2 (E, A, B, C, D, 26);
+         SHA1_ROUND_2 (D, E, A, B, C, 27);
+         SHA1_ROUND_2 (C, D, E, A, B, 28);
+         SHA1_ROUND_2 (B, C, D, E, A, 29);
+         SHA1_ROUND_2 (A, B, C, D, E, 30);
+         SHA1_ROUND_2 (E, A, B, C, D, 31);
+         SHA1_ROUND_2 (D, E, A, B, C, 32);
+         SHA1_ROUND_2 (C, D, E, A, B, 33);
+         SHA1_ROUND_2 (B, C, D, E, A, 34);
+         SHA1_ROUND_2 (A, B, C, D, E, 35);
+         SHA1_ROUND_2 (E, A, B, C, D, 36);
+         SHA1_ROUND_2 (D, E, A, B, C, 37);
+         SHA1_ROUND_2 (C, D, E, A, B, 38);
+         SHA1_ROUND_2 (B, C, D, E, A, 39);
+         SHA1_ROUND_3 (A, B, C, D, E, 40);
+         SHA1_ROUND_3 (E, A, B, C, D, 41);
+         SHA1_ROUND_3 (D, E, A, B, C, 42);
+         SHA1_ROUND_3 (C, D, E, A, B, 43);
+         SHA1_ROUND_3 (B, C, D, E, A, 44);
+         SHA1_ROUND_3 (A, B, C, D, E, 45);
+         SHA1_ROUND_3 (E, A, B, C, D, 46);
+         SHA1_ROUND_3 (D, E, A, B, C, 47);
+         SHA1_ROUND_3 (C, D, E, A, B, 48);
+         SHA1_ROUND_3 (B, C, D, E, A, 49);
+         SHA1_ROUND_3 (A, B, C, D, E, 50);
+         SHA1_ROUND_3 (E, A, B, C, D, 51);
+         SHA1_ROUND_3 (D, E, A, B, C, 52);
+         SHA1_ROUND_3 (C, D, E, A, B, 53);
+         SHA1_ROUND_3 (B, C, D, E, A, 54);
+         SHA1_ROUND_3 (A, B, C, D, E, 55);
+         SHA1_ROUND_3 (E, A, B, C, D, 56);
+         SHA1_ROUND_3 (D, E, A, B, C, 57);
+         SHA1_ROUND_3 (C, D, E, A, B, 58);
+         SHA1_ROUND_3 (B, C, D, E, A, 59);
+         SHA1_ROUND_4 (A, B, C, D, E, 60);
+         SHA1_ROUND_4 (E, A, B, C, D, 61);
+         SHA1_ROUND_4 (D, E, A, B, C, 62);
+         SHA1_ROUND_4 (C, D, E, A, B, 63);
+         SHA1_ROUND_4 (B, C, D, E, A, 64);
+         SHA1_ROUND_4 (A, B, C, D, E, 65);
+         SHA1_ROUND_4 (E, A, B, C, D, 66);
+         SHA1_ROUND_4 (D, E, A, B, C, 67);
+         SHA1_ROUND_4 (C, D, E, A, B, 68);
+         SHA1_ROUND_4 (B, C, D, E, A, 69);
+         SHA1_ROUND_4 (A, B, C, D, E, 70);
+         SHA1_ROUND_4 (E, A, B, C, D, 71);
+         SHA1_ROUND_4 (D, E, A, B, C, 72);
+         SHA1_ROUND_4 (C, D, E, A, B, 73);
+         SHA1_ROUND_4 (B, C, D, E, A, 74);
+         SHA1_ROUND_4 (A, B, C, D, E, 75);
+         SHA1_ROUND_4 (E, A, B, C, D, 76);
+         SHA1_ROUND_4 (D, E, A, B, C, 77);
+         SHA1_ROUND_4 (C, D, E, A, B, 78);
+         SHA1_ROUND_4 (B, C, D, E, A, 79);
+      end;
 
       Ctx.State (0) := Ctx.State (0) + A;
       Ctx.State (1) := Ctx.State (1) + B;
