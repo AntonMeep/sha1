@@ -1,6 +1,6 @@
 name = "sha1"
 description = "Secure Hash Algorithm 1 implemented in Ada"
-version = "1.1.0"
+version = "2.0.0"
 website = "https://github.com/AntonMeep/sha1"
 licenses = "ISC"
 tags = ["cryptography", "security", "sha1"]
