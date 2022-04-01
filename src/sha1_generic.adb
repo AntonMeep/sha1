@@ -3,7 +3,7 @@ pragma Ada_2012;
 with GNAT.Byte_Swapping;
 with System;
 
-package body SHA1 is
+package body SHA1_Generic is
    function Initialize return Context is
      ((State => <>, Count => 0, Buffer => (others => <>)));
 
@@ -13,24 +13,21 @@ package body SHA1 is
    end Initialize;
 
    procedure Update (Ctx : in out Context; Input : String) is
-      Buffer : Stream_Element_Array
-        (Stream_Element_Offset (Input'First) ..
-             Stream_Element_Offset (Input'Last));
+      Buffer : Element_Array (Index (Input'First) .. Index (Input'Last));
       for Buffer'Address use Input'Address;
       pragma Import (Ada, Buffer);
    begin
       Update (Ctx, Buffer);
    end Update;
 
-   procedure Update (Ctx : in out Context; Input : Stream_Element_Array) is
-      Current : Stream_Element_Offset := Input'First;
+   procedure Update (Ctx : in out Context; Input : Element_Array) is
+      Current : Index := Input'First;
    begin
       while Current <= Input'Last loop
          declare
-            Buffer_Index : constant Stream_Element_Offset :=
-              Ctx.Count rem Block_Length;
-            Bytes_To_Copy : constant Stream_Element_Offset :=
-              Stream_Element_Offset'Min
+            Buffer_Index  : constant Index := Ctx.Count rem Block_Length;
+            Bytes_To_Copy : constant Index :=
+              Index'Min
                 (Input'Length - (Current - Input'First),
                  Ctx.Buffer'Last - Buffer_Index + 1);
          begin
@@ -57,19 +54,19 @@ package body SHA1 is
       use GNAT.Byte_Swapping;
       use System;
 
-      Current     : Stream_Element_Offset          := Output'First;
-      Final_Count : constant Stream_Element_Offset := Ctx.Count;
+      Current     : Index          := Output'First;
+      Final_Count : constant Index := Ctx.Count;
 
       Ctx_Copy : Context := Ctx;
    begin
       --  Insert padding
-      Update (Ctx_Copy, Stream_Element_Array'(0 => 16#80#));
+      Update (Ctx_Copy, Element_Array'(0 => 16#80#));
 
       if Ctx_Copy.Buffer'Last - (Ctx_Copy.Count rem Block_Length) < 8 then
          --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx_Copy,
-            Stream_Element_Array'
+            Element_Array'
               (0 ..
                    (Ctx_Copy.Buffer'Last -
                     (Ctx_Copy.Count rem Block_Length)) =>
@@ -79,7 +76,7 @@ package body SHA1 is
       --  Fill rest of the data with zeroes
       Update
         (Ctx_Copy,
-         Stream_Element_Array'
+         Element_Array'
            (0 ..
                 (Ctx_Copy.Buffer'Last - (Ctx_Copy.Count rem Block_Length) -
                  8) =>
@@ -90,7 +87,7 @@ package body SHA1 is
          Byte_Length : Unsigned_64 :=
            Shift_Left (Unsigned_64 (Final_Count), 3);
 
-         Byte_Length_Buffer : Stream_Element_Array (0 .. 7);
+         Byte_Length_Buffer : Element_Array (0 .. 7);
          for Byte_Length_Buffer'Address use Byte_Length'Address;
          pragma Import (Ada, Byte_Length_Buffer);
       begin
@@ -102,7 +99,7 @@ package body SHA1 is
 
       for H of Ctx_Copy.State loop
          declare
-            Buffer : Stream_Element_Array (0 .. 3);
+            Buffer : Element_Array (0 .. 3);
             for Buffer'Address use H'Address;
             pragma Import (Ada, Buffer);
          begin
@@ -122,7 +119,7 @@ package body SHA1 is
       return Finalize (Ctx);
    end Hash;
 
-   function Hash (Input : Stream_Element_Array) return Digest is
+   function Hash (Input : Element_Array) return Digest is
       Ctx : Context := Initialize;
    begin
       Update (Ctx, Input);
@@ -335,4 +332,4 @@ package body SHA1 is
       Ctx.State (3) := Ctx.State (3) + D;
       Ctx.State (4) := Ctx.State (4) + E;
    end Transform;
-end SHA1;
+end SHA1_Generic;
