@@ -1,42 +1,54 @@
 pragma Ada_2012;
 
+with Ada.Unchecked_Conversion;
 with GNAT.Byte_Swapping;
 with System;
 
-package body SHA1_Generic is
+package body SHA1 with
+   SPARK_Mode => On
+is
    function Initialize return Context is
-     ((State => <>, Count => 0, Buffer => (others => <>)));
+     ((State => <>, Count => 0, Buffer => (others => 0)));
 
    procedure Initialize (Ctx : out Context) is
    begin
       Ctx := Initialize;
    end Initialize;
 
-   procedure Update (Ctx : in out Context; Input : String) is
-      Buffer : Element_Array (Index (Input'First) .. Index (Input'Last));
-      for Buffer'Address use Input'Address;
+   procedure Update (Ctx : in out Context; Input : String) with
+      SPARK_Mode => Off
+   is
+      Buffer : Stream_Element_Array
+        (Stream_Element_Offset (Input'First) ..
+             Stream_Element_Offset (Input'Last));
+      Input_Copy : aliased String := Input;
+      for Buffer'Address use Input_Copy'Address;
       pragma Import (Ada, Buffer);
    begin
       Update (Ctx, Buffer);
    end Update;
 
-   procedure Update (Ctx : in out Context; Input : Element_Array) is
-      Current : Index := Input'First;
+   procedure Update (Ctx : in out Context; Input : Stream_Element_Array) is
+      Current : Stream_Element_Offset := Input'First;
    begin
       while Current <= Input'Last loop
          declare
-            Buffer_Index  : constant Index := Ctx.Count rem Block_Length;
-            Bytes_To_Copy : constant Index :=
-              Index'Min
+            Buffer_Stream_Element_Offset : constant Stream_Element_Offset :=
+              Ctx.Count rem Block_Length;
+            Bytes_To_Copy : constant Stream_Element_Offset :=
+              Stream_Element_Offset'Min
                 (Input'Length - (Current - Input'First),
-                 Ctx.Buffer'Last - Buffer_Index + 1);
+                 Ctx.Buffer'Last - Buffer_Stream_Element_Offset + 1);
          begin
-            Ctx.Buffer (Buffer_Index .. Buffer_Index + Bytes_To_Copy - 1) :=
+            Ctx.Buffer
+              (Buffer_Stream_Element_Offset ..
+                   Buffer_Stream_Element_Offset + Bytes_To_Copy - 1) :=
               Input (Current .. Current + Bytes_To_Copy - 1);
             Current   := Current + Bytes_To_Copy;
             Ctx.Count := Ctx.Count + Bytes_To_Copy;
 
-            if Ctx.Buffer'Last < Buffer_Index + Bytes_To_Copy then
+            if Ctx.Buffer'Last < Buffer_Stream_Element_Offset + Bytes_To_Copy
+            then
                Transform (Ctx);
             end if;
          end;
@@ -54,19 +66,19 @@ package body SHA1_Generic is
       use GNAT.Byte_Swapping;
       use System;
 
-      Current     : Index          := Output'First;
-      Final_Count : constant Index := Ctx.Count;
+      Current     : Stream_Element_Offset          := Output'First;
+      Final_Count : constant Stream_Element_Offset := Ctx.Count;
 
       Ctx_Copy : Context := Ctx;
    begin
       --  Insert padding
-      Update (Ctx_Copy, Element_Array'(0 => 16#80#));
+      Update (Ctx_Copy, Stream_Element_Array'(0 => 16#80#));
 
       if Ctx_Copy.Buffer'Last - (Ctx_Copy.Count rem Block_Length) < 8 then
          --  In case not enough space is left in the buffer we fill it up
          Update
            (Ctx_Copy,
-            Element_Array'
+            Stream_Element_Array'
               (0 ..
                    (Ctx_Copy.Buffer'Last -
                     (Ctx_Copy.Count rem Block_Length)) =>
@@ -76,7 +88,7 @@ package body SHA1_Generic is
       --  Fill rest of the data with zeroes
       Update
         (Ctx_Copy,
-         Element_Array'
+         Stream_Element_Array'
            (0 ..
                 (Ctx_Copy.Buffer'Last - (Ctx_Copy.Count rem Block_Length) -
                  8) =>
@@ -87,39 +99,48 @@ package body SHA1_Generic is
          Byte_Length : Unsigned_64 :=
            Shift_Left (Unsigned_64 (Final_Count), 3);
 
-         Byte_Length_Buffer : Element_Array (0 .. 7);
-         for Byte_Length_Buffer'Address use Byte_Length'Address;
-         pragma Import (Ada, Byte_Length_Buffer);
+         subtype Stream_Element_Array_8 is Stream_Element_Array (0 .. 7);
+         for Stream_Element_Array_8'Object_Size use Unsigned_64'Object_Size;
+
+         function Swapped is new GNAT.Byte_Swapping.Swapped8 (Unsigned_64);
+         function Convert is new Ada.Unchecked_Conversion
+           (Unsigned_64, Stream_Element_Array_8);
       begin
          if Default_Bit_Order /= High_Order_First then
-            Swap8 (Byte_Length_Buffer'Address);
+            Byte_Length := Swapped (Byte_Length);
          end if;
-         Update (Ctx_Copy, Byte_Length_Buffer);
+         Update (Ctx_Copy, Convert (Byte_Length));
       end;
 
       for H of Ctx_Copy.State loop
          declare
-            Buffer : Element_Array (0 .. 3);
-            for Buffer'Address use H'Address;
-            pragma Import (Ada, Buffer);
+            subtype Stream_Element_Array_4 is Stream_Element_Array (0 .. 3);
+            for Stream_Element_Array_4'Object_Size use Unsigned_32'Object_Size;
+
+            function Swapped is new GNAT.Byte_Swapping.Swapped4 (Unsigned_32);
+            function Convert is new Ada.Unchecked_Conversion
+              (Unsigned_32, Stream_Element_Array_4);
+            Buffer : Unsigned_32 := H;
          begin
             if Default_Bit_Order /= High_Order_First then
-               Swap4 (Buffer'Address);
+               Buffer := Swapped (Buffer);
             end if;
-            Output (Current + 0 .. Current + 3) := Buffer;
+            Output (Current + 0 .. Current + 3) := Convert (Buffer);
             Current                             := Current + 4;
          end;
       end loop;
    end Finalize;
 
-   function Hash (Input : String) return Digest is
+   function Hash (Input : String) return Digest with
+      SPARK_Mode => Off
+   is
       Ctx : Context := Initialize;
    begin
       Update (Ctx, Input);
       return Finalize (Ctx);
    end Hash;
 
-   function Hash (Input : Element_Array) return Digest is
+   function Hash (Input : Stream_Element_Array) return Digest is
       Ctx : Context := Initialize;
    begin
       Update (Ctx, Input);
@@ -138,20 +159,31 @@ package body SHA1_Generic is
       E : Unsigned_32 := Ctx.State (4);
    begin
       declare
-         use GNAT.Byte_Swapping;
          use System;
 
-         Buffer_Words : Words (0 .. 15);
-         for Buffer_Words'Address use Ctx.Buffer'Address;
-         pragma Import (Ada, Buffer_Words);
-      begin
-         W (0 .. 15) := Buffer_Words;
+         subtype Stream_Element_Array_4 is Stream_Element_Array (0 .. 3);
+         for Stream_Element_Array_4'Object_Size use Unsigned_32'Object_Size;
 
-         if Default_Bit_Order /= High_Order_First then
-            for I in Buffer_Words'Range loop
-               Swap4 (W (I)'Address);
-            end loop;
-         end if;
+         function Swapped is new GNAT.Byte_Swapping.Swapped4 (Unsigned_32);
+         function Convert is new Ada.Unchecked_Conversion
+           (Stream_Element_Array_4, Unsigned_32);
+      begin
+         for I in W'Range loop
+            if Default_Bit_Order /= High_Order_First then
+               W (I) :=
+                 Swapped
+                   (Convert
+                      (Ctx.Buffer
+                         (Stream_Element_Offset (I * 4) ..
+                              Stream_Element_Offset (I * 4 + 3))));
+            else
+               W (I) :=
+                 Convert
+                   (Ctx.Buffer
+                      (Stream_Element_Offset (I * 4) ..
+                           Stream_Element_Offset (I * 4 + 3)));
+            end if;
+         end loop;
       end;
 
       declare
@@ -332,4 +364,4 @@ package body SHA1_Generic is
       Ctx.State (3) := Ctx.State (3) + D;
       Ctx.State (4) := Ctx.State (4) + E;
    end Transform;
-end SHA1_Generic;
+end SHA1;
